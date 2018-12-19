@@ -1,7 +1,7 @@
 #!/bin/bash -x
 
 # Clear old repos
-#rm -rf awx*
+rm -rf awx*
 
 # Check out awx
 if [ ! -d "awx" ]
