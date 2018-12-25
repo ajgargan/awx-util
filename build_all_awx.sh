@@ -25,11 +25,23 @@ then
 git clone https://github.com/ansible/awx-logos.git
 fi
 
+	# Stop all running containers
+	docker stop $(docker ps -q)
+	# purge containers
+	docker container prune -f
+	docker image prune -f
+	docker system prune -f
 
 #Run build for each release version of AWX
 for i in $(cat versions.txt)
 do
 	# running in the background
-	./build_awx.sh $i >> build-$i.log 2>&1
+	./build_awx.sh -v $i >> build-$i.log 2>&1
 	#/./build_awx.sh $i
+	# Stop all running containers
+	sleep 10
+	echo "Checking the task container logs"
+	docker logs awx_task | tail -n 20 
+	sleep 240	
+	docker stop $(docker ps -q)
 done

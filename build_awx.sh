@@ -1,7 +1,33 @@
-#!/bin/bash -x
+#!/bin/bash
 
-# Clear old repos
-rm -rf awx*
+usage() {
+  echo "Usage: ${0} [-v <version>] [-b] [-l]"
+  echo "-v <version_to_build>"
+  echo "-b Build from source don't use official docker images"
+  echo "-l Include Official AWX Logos this will cause a build from source"
+  echo
+}
+
+# Defaults
+logo=false
+build=false
+
+while getopts 'h?lbv:' flag; do
+  case ${flag} in
+    h) usage && exit 0 ;;
+    l) logo="true" && build="true" ;;
+    b) build="true" ;;
+    v) version="${OPTARG}" ;;
+    *) usage && exit 1 ;; # die "invalid option found" ;;
+  esac
+done
+
+
+# If we are not supplied a version assume latest
+: ${version:="latest"}
+
+echo "version: $version"
+#exit
 
 # Check out awx
 if [ ! -d "awx" ]
@@ -13,13 +39,6 @@ fi
 if [ ! -d "awx-logos" ]
 then
 	git clone https://github.com/ansible/awx-logos.git
-fi
-
-if [ "X$1" != "X" ]
-then
-	version=$1
-else
-	version=latest
 fi
 
 # Create build dir
@@ -39,16 +58,26 @@ then
    git checkout $1 
 
    # Build official logos (Since we are using an official release)
-   sed -i "s/^# awx_official=false/awx_official=true/g" installer/inventory
+   if [ $logo ]
+   then
+      sed -i "s/^# awx_official=false/awx_official=true/g" installer/inventory
+   fi
 fi
 
-# TODO: make this optional
 # Don't use docker_hub images
-sed -i "s/^dockerhub/#docker/g" installer/inventory
+if [ $build ]
+then
+   sed -i "s/^dockerhub/#docker/g" installer/inventory
+fi
 
 # run installer
 cd installer
-ansible-playbook -i inventory install.yml
+if [ "$version" != "latest" ]
+then
+	ansible-playbook -i inventory -e awx_version=$version install.yml
+else
+	ansible-playbook -i inventory install.yml
+fi
 
 # Install / awx / build 
 cd ../../..
