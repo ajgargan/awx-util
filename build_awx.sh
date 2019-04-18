@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 usage() {
   echo "Usage: ${0} [-v <version>] [-b] [-l]"
@@ -55,7 +55,7 @@ ls -l --color
 # if we get given a release checkout that version
 if [ "$version" != "latest" ]
 then
-   git checkout $1 
+   git checkout $version 
 
    # Build official logos (Since we are using an official release)
    if [ $logo ]
@@ -68,10 +68,15 @@ fi
 if [ $build ]
 then
    sed -i "s/^dockerhub/#docker/g" installer/inventory
+   
 fi
 
 # run installer
 cd installer
+
+# link the dist folder so it can be found
+ln -s ../dist/ dist
+
 if [ "$version" != "latest" ]
 then
 	ansible-playbook -i inventory -e awx_version=$version install.yml

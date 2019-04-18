@@ -19,6 +19,9 @@ then
 	git clone https://github.com/ansible/awx.git
 fi
 
+# Make sure docker is running 
+service docker restart
+
 # Check out awx-logos
 if [ ! -d "awx-logos" ]
 then
@@ -26,7 +29,10 @@ git clone https://github.com/ansible/awx-logos.git
 fi
 
 	# Stop all running containers
-	docker stop $(docker ps -q)
+	if [ "X" != "X$(docker ps -q)" ] 
+	then
+		docker stop $(docker ps -q)
+	fi
 	# purge containers
 	docker container prune -f
 	docker image prune -f
@@ -36,12 +42,22 @@ fi
 for i in $(cat versions.txt)
 do
 	# running in the background
-	./build_awx.sh -v $i >> build-$i.log 2>&1
+	./build_awx.sh -b -l -v $i >> build-$i.log 2>&1
 	#/./build_awx.sh $i
 	# Stop all running containers
 	sleep 10
-	echo "Checking the task container logs"
-	docker logs awx_task | tail -n 20 
-	sleep 240	
-	docker stop $(docker ps -q)
+	#echo "Checking the task container logs"
+	#docker logs awx_task | tail -n 20 
+	#sleep 240	
+	if [ "X" != "X$(docker ps -q)" ] 
+	then
+		docker stop $(docker ps -q)
+	fi
+	# purge containers
+	docker container prune -f
+	docker image prune -f
+	docker system prune -f
 done
+
+#collate all of these
+
