@@ -1,5 +1,6 @@
 # awx-util
-The idea is to put all my scripts for manually testing in a single place
+
+Why? So I can be sure the builds will work for the awx quickstart
 
 Build a single release using official images
 ```
@@ -16,4 +17,9 @@ Build a single release building the containers with official Logos (currently pr
 Build all release versions using Dockerhub images
 ```
 ./build_all_awx.sh 
+```
+
+versions.txt
+```
+simply a list of release versions
 ```
