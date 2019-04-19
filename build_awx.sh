@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash 
 
 usage() {
   echo "Usage: ${0} [-v <version>] [-b] [-l]"
@@ -32,13 +32,13 @@ echo "version: $version"
 # Check out awx
 if [ ! -d "awx" ]
 then
-	git clone https://github.com/ansible/awx.git
+        git clone https://github.com/ansible/awx.git
 fi
 
 # Check out awx-logos
 if [ ! -d "awx-logos" ]
 then
-	git clone https://github.com/ansible/awx-logos.git
+        git clone https://github.com/ansible/awx-logos.git
 fi
 
 # Create build dir
@@ -50,12 +50,12 @@ cp -v -dpru awx/ build-$version/
 
 cd build-$version/awx
 pwd
-ls -l --color
+#ls -l --color
 
 # if we get given a release checkout that version
 if [ "$version" != "latest" ]
 then
-   git checkout $version 
+   git checkout $version
 
    # Build official logos (Since we are using an official release)
    if [ $logo ]
@@ -64,12 +64,14 @@ then
    fi
 fi
 
+#
+echo "BUILD: $build"
 # Don't use docker_hub images
-if [ $build ]
-then
-   sed -i "s/^dockerhub/#docker/g" installer/inventory
-   
-fi
+#if [ $build ]
+#then
+#   sed -i "s/^dockerhub_base/#dockerhub_base/g" installer/inventory
+#
+#fi
 
 # run installer
 cd installer
@@ -79,13 +81,22 @@ ln -s ../dist/ dist
 
 if [ "$version" != "latest" ]
 then
-	ansible-playbook -i inventory -e awx_version=$version install.yml
+        echo $version > ../VERSION
+        echo -n "VERSION: "
+        cat ../VERSION
+        echo "$(pwd)/VERSION"
+        # set image versions to use
+        sed -i "s/^dockerhub_version=latest/dockerhub_version=$version/g" inventory
+        sed -i "s/^postgres_data_dir=\/tmp\/pgdocker/postgres_data_dir=\/tmp\/$version\/pgdocker/g" inventory
+
+        ansible-playbook -i inventory -e awx_version=$version install.yml
 else
-	ansible-playbook -i inventory install.yml
+        ansible-playbook -i inventory install.yml
 fi
 
-# Install / awx / build 
+# Install / awx / build
 cd ../../..
 
 # cleanup
 #rm -rf build-$version
+
