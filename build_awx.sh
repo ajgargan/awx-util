@@ -70,7 +70,7 @@ echo "BUILD: $build"
 #if [ $build ]
 #then
 #   sed -i "s/^dockerhub_base/#dockerhub_base/g" installer/inventory
-#
+#   
 #fi
 
 # run installer
@@ -84,7 +84,7 @@ then
         echo $version > ../VERSION
         echo -n "VERSION: "
         cat ../VERSION
-        echo "$(pwd)/VERSION"
+        echo "$(pwd)/VERSION"     
         # set image versions to use
         sed -i "s/^dockerhub_version=latest/dockerhub_version=$version/g" inventory
         sed -i "s/^postgres_data_dir=\/tmp\/pgdocker/postgres_data_dir=\/tmp\/$version\/pgdocker/g" inventory
@@ -94,9 +94,8 @@ else
         ansible-playbook -i inventory install.yml
 fi
 
-# Install / awx / build
+# Install / awx / build 
 cd ../../..
 
 # cleanup
 #rm -rf build-$version
-
