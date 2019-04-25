@@ -1,99 +1,101 @@
-#!/bin/bash
+#!/bin/bash 
 
-#Install epel
-echo "Install epel"
-yum install -y epel-release >/dev/null 2>&1
+usage() {
+  echo "Usage: ${0} [-v <version>] [-b] [-l]"
+  echo "-v <version_to_build>"
+  echo "-b Build from source don't use official docker images"
+  echo "-l Include Official AWX Logos this will cause a build from source"
+  echo
+}
 
-#Install dependencies via yum
-echo "Install rpm dependencies"
-yum install -y --enablerepo epel git gcc docker curl docker-compose python27-pip python27-devel libffi-devel openssl-devel curl util-linux > /dev/null 2>&1
+# Defaults
+logo=false
+build=false
 
-#Install python dependencies
-echo "Install python dependencies"
-/usr/bin/pip install -U docker ansible awscli >/dev/null 2>&1
+while getopts 'h?lbv:' flag; do
+  case ${flag} in
+    h) usage && exit 0 ;;
+    l) logo="true" && build="true" ;;
+    b) build="true" ;;
+    v) version="${OPTARG}" ;;
+    *) usage && exit 1 ;; # die "invalid option found" ;;
+  esac
+done
 
-#Remove old crap
-echo "Cleaning up old builds and git project pulls"
-rm -rf awx*
-rm -rf build-*
+
+# If we are not supplied a version assume latest
+: ${version:="latest"}
+
+echo "version: $version"
+#exit
 
 # Check out awx
 if [ ! -d "awx" ]
 then
-        echo "Checkout awx"
         git clone https://github.com/ansible/awx.git
 fi
-
-# Make sure docker is running 
-echo "Make sure docker is running"
-service docker restart
 
 # Check out awx-logos
 if [ ! -d "awx-logos" ]
 then
-        echo "Checkout awx-logos"
         git clone https://github.com/ansible/awx-logos.git
 fi
 
-echo "Stop all running containers"
-# Stop all running containers
-if [ "X" != "X$(docker ps -q)" ]
+# Create build dir
+mkdir -p build-$version
+
+# Copy projects into build
+cp -v -dpru awx-logos/ build-$version/
+cp -v -dpru awx/ build-$version/
+
+cd build-$version/awx
+pwd
+#ls -l --color
+
+# if we get given a release checkout that version
+if [ "$version" != "latest" ]
 then
-        docker stop $(docker ps -q)
-        docker rm -v $(docker ps -a -q) >/dev/null 2>&1
+   git checkout $version
+
+   # Build official logos (Since we are using an official release)
+   if [ $logo ]
+   then
+      sed -i "s/^# awx_official=false/awx_official=true/g" installer/inventory
+   fi
 fi
 
-echo "Purge existing container images"
-# purge containers
-docker volume prune -f
-docker container prune -f
-docker image prune -a -f
-docker system prune -a -f
+#
+echo "BUILD: $build"
+# Don't use docker_hub images
+#if [ $build ]
+#then
+#   sed -i "s/^dockerhub_base/#dockerhub_base/g" installer/inventory
+#   
+#fi
 
-#Run build for each release version of AWX
-for i in $(cat versions.txt)
-do
-        # running in the background
-        ./build_awx.sh -v $i >> build-$i.log 2>&1
-        #/./build_awx.sh $i
-        # Stop all running containers
-        echo "Give containers 4 minutes to do their thing"
-        sleep 240
-        #echo "Checking the task container logs"
-        echo "Add container logs to build log"
-        docker logs awx_task >> build-$i-awx_task.log 2>&1
-        docker logs awx_web >> build-$i-awx_web.log 2>&1
-        docker logs postgres >> build-$i-postgres.log 2>&1
-        docker logs memcached >> build-$i-memcached.log 2>&1
-        docker logs rabbitmq >> build-$i-rabbitmq.log 2>&1
+# run installer
+cd installer
 
-        # This gives us the changes in terms of the ENV etc.
-        echo "Add container inspect to build log"
-        docker inspect awx_task >> build-$i-awx_task-inspect.json 2>&1
-        docker inspect awx_web >> build-$i-awx_web-inspect.json 2>&1
-        docker inspect postgres >> build-$i-postgres-inspect.json 2>&1
-        docker inspect memcached >> build-$i-memcached-inspect.json 2>&1
-        docker inspect rabbitmq >> build-$i-rabbitmq-inspect.json 2>&1
+# link the dist folder so it can be found
+ln -s ../dist/ dist
 
-        echo "Connecting to the awx_web host to check"
-        curl -o build-$i-awx_web.html http://localhost/
-        curl --trace-ascii http://localhost/ >> build-$i-curl-trace-ascii.log
+if [ "$version" != "latest" ]
+then
+        echo $version > ../VERSION
+        echo -n "VERSION: "
+        cat ../VERSION
+        echo "$(pwd)/VERSION"     
+        # set image versions to use
+        sed -i "s/^dockerhub_version=latest/dockerhub_version=$version/g" inventory
+        sed -i "s/^postgres_data_dir=\/tmp\/pgdocker/postgres_data_dir=\/tmp\/$version\/pgdocker/g" inventory
 
-        #sleep 240      
-        echo "stopping containers"
-        if [ "X" != "X$(docker ps -a -q)" ]
-        then
-                docker stop $(docker ps -a -q) >/dev/null 2>&1
-                docker rm -v $(docker ps -a -q) >/dev/null 2>&1
-        fi
-        sleep 20
-done
-# purge containers
-echo "purging containers"
-docker volume prune -f
-docker container prune -f
-docker image prune -a -f
-docker system prune -a -f
+        ansible-playbook -i inventory -e awx_version=$version install.yml
+else
+        ansible-playbook -i inventory install.yml
+fi
 
-#collate all of these
-grep "failed=" *.log
+# Install / awx / build 
+cd ../../..
+
+# cleanup
+#rm -rf build-$version
